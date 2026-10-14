@@ -40,6 +40,10 @@ public:
     // Returns false and sets error() on failure.
     bool load_demo_scene(Scene& scene);
 
+    // Loads every (mesh, texture) pair of the first bundle into `world`, paired
+    // by order of appearance. Returns false and sets error() on failure.
+    bool load_demo_world(World& world);
+
     // Runs the full demo (native): renders frameCount frames, writing PPMs.
     bool run();
 

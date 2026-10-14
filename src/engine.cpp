@@ -156,6 +156,34 @@ bool Engine::load_demo_scene(Scene& scene) {
     return true;
 }
 
+bool Engine::load_demo_world(World& world) {
+    const auto& b = bundles_.front();
+    std::vector<const BundleEntry*> meshes, textures;
+    for (const auto& e : b.second.entries) {
+        if (e.type == AssetType::Mesh) meshes.push_back(&e);
+        else if (e.type == AssetType::Texture) textures.push_back(&e);
+    }
+    size_t n = std::min(meshes.size(), textures.size());
+    for (size_t i = 0; i < n; i++) {
+        WorldObject obj;
+        std::vector<uint8_t> raw;
+        if (!load_asset(b.first, *meshes[i], raw) || !decode_mesh(raw, obj.mesh)) {
+            error_ = "mesh load failed";
+            return false;
+        }
+        if (!load_asset(b.first, *textures[i], raw) || !decode_texture(raw, obj.texture)) {
+            error_ = "texture load failed";
+            return false;
+        }
+        world.objects.push_back(std::move(obj));
+    }
+    if (world.objects.empty()) {
+        error_ = "bundle has no (mesh, texture) pairs";
+        return false;
+    }
+    return true;
+}
+
 bool Engine::run() {
     // Demo scene: first mesh + first texture in the first bundle.
     Scene scene;

@@ -14,8 +14,9 @@ self.onmessage = (ev) => {
   const base = m.base || '';
   const bc = new BroadcastChannel('progress');
 
-  // Shared per-frame state: a 4x4 MVP matrix (64 bytes) + a frame counter (4 bytes).
-  const frameState = new SharedArrayBuffer(64 + 4);
+  // Shared per-frame state: up to 8 MVP matrices (8 * 64 bytes) + a frame
+  // counter (4 bytes). The engine writes per-object MVPs; the GPU worker reads.
+  const frameState = new SharedArrayBuffer(8 * 64 + 4);
 
   // 1. Spawn the helper workers and hand the OffscreenCanvas to the GPU worker.
   const io = new Worker(base + '/io_worker.js');

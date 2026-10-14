@@ -5,6 +5,9 @@
 而是**照它的引擎使用方式**从零实现一套等价架构，并改用**自定义资源格式**，
 这样你可以自己造 assets 直接接进来。
 
+当前已是一个**可玩的第三人称骨架**：一块地面 + 一个角色方块，WASD 走动、
+鼠标拖拽转相机、滚轮缩放，全部跑在真 WebGPU 管线 + 字节区间流式 IO 上。
+
 > 注意：该站点加载的是 Rockstar 的版权游戏数据。本项目不包含、也不下载任何
 > GTA 资源；`data/` 里是用脚本生成的自制测试资源。
 
@@ -83,15 +86,16 @@ python3 serve.py 8790 web      # 带 COOP/COEP + Range 的静态服务器
 （指针锁）写进另一个 SharedArrayBuffer，引擎读输入来转相机——和 GTA 移植版用
 SharedArrayBuffer + Atomics 做跨线程同步是同一套做法。
 
-操作：点击锁定鼠标，拖拽/滚轮/WASD/方向键转相机，Q/E 缩放。
+操作：点击锁定鼠标，拖拽/滚轮/QE 转相机缩放，WASD/方向键让角色在地面上走动。
 
 ## 下一步（把骨架做成完整引擎）
 
 1. **异步 IO 桥**：把 `EmscriptenStreamStore` 的同步 XHR 换成
    `io_worker.js` 异步 fetch + SharedArrayBuffer/Atomics 桥（同步 XHR 在
    worker 里可用但已弃用；接口不变，只换传输）。
-2. **场景/资源系统**：多个 bundle、依赖加载、LRU 缓存、加载队列。
-3. **存档**：IndexedDB 读写 `/userdata`（对标它的 `gta5-userdata`）。
+2. **深度缓冲**：渲染管线加 depthStencil，让多物体按深度正确遮挡。
+3. **场景/资源系统**：多个 bundle、依赖加载、LRU 缓存、加载队列、碰撞/重力。
+4. **存档**：IndexedDB 读写 `/userdata`（对标它的 `gta5-userdata`）。
 
 ## 测试
 

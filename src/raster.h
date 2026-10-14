@@ -24,6 +24,17 @@ struct Scene {
     Texture texture;
 };
 
+// A world: several meshes, each with its own texture. Used by the browser demo
+// (ground + character) and uploaded to the GPU worker as separate objects.
+struct WorldObject {
+    Mesh mesh;
+    Texture texture;
+};
+
+struct World {
+    std::vector<WorldObject> objects;
+};
+
 struct FrameBuffer {
     uint32_t width = 0, height = 0;
     std::vector<uint8_t> rgba; // width*height*4, 0 = clear colour
