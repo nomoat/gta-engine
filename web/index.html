@@ -1,0 +1,93 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>engine</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+  #canvas { display: block; width: 100vw; height: 100vh; cursor: crosshair; }
+  #status { position: fixed; left: 12px; bottom: 12px; color: #9f9; font: 13px monospace; }
+  #hint { position: fixed; left: 12px; top: 12px; color: #ccc; font: 12px monospace; }
+</style>
+</head>
+<body>
+<canvas id="canvas" width="800" height="600" tabindex="0"></canvas>
+<div id="status">starting…</div>
+<div id="hint">click to lock mouse · drag = orbit · wheel = zoom · WASD = orbit · Q/E = zoom</div>
+<script>
+'use strict';
+// Browser shell — mirrors the GTA port's page: a canvas + a Worker that hosts the
+// engine. The canvas is transferred to that worker, which hands it on to the GPU
+// worker. All game data is streamed by io_worker.js over HTTP Range.
+const canvas = document.getElementById('canvas');
+const status = document.getElementById('status');
+const setStatus = (t) => { status.textContent = t; };
+
+// Progress via BroadcastChannel (same idea as the GTA port's game-progress).
+const progress = new BroadcastChannel('progress');
+window.__logs = [];
+progress.onmessage = (ev) => {
+  const d = ev.data || {};
+  if (d.pct !== undefined)
+    setStatus(`${d.label || ''} ${(d.pct).toFixed(0)}%`);
+  if (d.log) { window.__logs.push(d.log); setStatus(d.log); }
+  if (d.error) { window.__logs.push('ERROR: ' + d.error); setStatus(d.error); }
+};
+
+// ---- Input state: a SharedArrayBuffer the page writes and the engine reads ----
+// (the GTA port's installInput writes keys/mouse into wasm memory with Atomics;
+//  here we use a standalone SAB shared with the engine worker — same idea).
+// Layout:
+//   Int32Array[0..8)  : dx, dy, wheel, buttons, locked, reserved, reserved, reserved (32 bytes)
+//   Uint8Array[32..)  : per-key down state (0x80 = down), indexed by keyCode (256 bytes)
+const inputState = new SharedArrayBuffer(256 + 32);
+const i32 = new Int32Array(inputState, 0, 8);
+const keys = new Uint8Array(inputState, 32, 256);
+
+let locked = false;
+canvas.addEventListener('click', () => { if (!locked) canvas.requestPointerLock(); });
+document.addEventListener('pointerlockchange', () => {
+  locked = document.pointerLockElement === canvas;
+  Atomics.store(i32, 4, locked ? 1 : 0);
+  if (!locked) { // release all keys when the pointer unlocks (avoid stuck keys)
+    for (let i = 0; i < 256; i++) Atomics.store(keys, i, 0);
+  }
+});
+document.addEventListener('mousemove', (e) => {
+  if (!locked) return;
+  Atomics.add(i32, 0, e.movementX); // accumulated deltas; engine reads + resets
+  Atomics.add(i32, 1, e.movementY);
+});
+document.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  Atomics.add(i32, 2, Math.sign(e.deltaY));
+}, { passive: false });
+window.addEventListener('keydown', (e) => {
+  if (e.code === 'Escape') return;
+  e.preventDefault();
+  Atomics.store(keys, e.keyCode & 255, 0x80);
+});
+window.addEventListener('keyup', (e) => {
+  Atomics.store(keys, e.keyCode & 255, 0);
+});
+canvas.addEventListener('mousedown', (e) => Atomics.or(i32, 3, 1 << e.button));
+window.addEventListener('mouseup', (e) => Atomics.and(i32, 3, ~(1 << e.button)));
+
+const worker = new Worker('loader.js');
+worker.onerror = (e) => setStatus('worker error: ' + e.message);
+worker.onmessage = (ev) => {
+  if (ev.data && ev.data.log) { window.__logs.push('[w] ' + ev.data.log); setStatus(ev.data.log); }
+};
+
+// Transfer the canvas + boot options + the shared input state to the engine host.
+const offscreen = canvas.transferControlToOffscreen();
+worker.postMessage({
+  type: 'start',
+  canvas: offscreen,
+  base: location.origin,
+  manifest: 'bootset.json',
+  inputState,
+}, [offscreen]);
+</script>
+</body>
+</html>

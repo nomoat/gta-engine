@@ -1,0 +1,17 @@
+# Build output
+/build/
+/build-web/
+
+# Emscripten deploy artifacts (rebuilt from source)
+/web/game.js
+/web/game.wasm
+/web/data/
+
+# Generated demo data + frames
+/data/game.bundle
+/data/bootset.json
+/frame_*.ppm
+/demo_frame.png
+
+# OS / editor
+.DS_Store
